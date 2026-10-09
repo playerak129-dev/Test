@@ -1,0 +1,131 @@
+name: Build Android Debug APK
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Set up Java 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: |
+          yes | sdkmanager --licenses || true
+
+      - name: Install dependencies
+        run: |
+          if [ -f "bun.lock" ] && command -v bun &> /dev/null; then
+            echo "Lockfile bun.lock détecté. Installation via Bun..."
+            bun install --frozen-lockfile || bun install
+          elif [ -f "package-lock.json" ]; then
+            echo "Lockfile package-lock.json détecté. Installation via npm ci..."
+            npm ci || npm install --legacy-peer-deps
+          else
+            echo "Installation standard via npm..."
+            npm install --legacy-peer-deps
+          fi
+
+      - name: Build web application
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL || vars.VITE_API_BASE_URL || '' }}
+        run: |
+          if [ -f "bun.lock" ] && command -v bun &> /dev/null; then
+            bun run build
+          else
+            npm run build
+          fi
+
+          if [ ! -f "dist/index.html" ]; then
+            echo "::error::Échec de la compilation web : dist/index.html introuvable."
+            exit 1
+          fi
+
+      - name: Find or Initialize Android project
+        run: |
+          echo "=== Vérification de la configuration Android ==="
+          if [ -d "android" ] && [ -f "android/gradlew" ]; then
+            echo "✅ Projet Android Gradle existant détecté dans ./android."
+            echo "✅ Gradle Wrapper présent : android/gradlew"
+          else
+            echo "⚠️ Aucun projet Android ou Gradle Wrapper trouvé dans le dépôt."
+            echo "ℹ️ Génération de la plateforme Android avec Capacitor (@capacitor/android)..."
+            npx cap add android
+            if [ ! -f "android/gradlew" ]; then
+              echo "::error::Échec de la génération de la plateforme Android : android/gradlew est introuvable."
+              exit 1
+            fi
+            echo "✅ Plateforme Android générée avec succès."
+          fi
+
+      - name: Sync Capacitor Android
+        run: |
+          echo "Synchronisation des assets web et des configurations natives..."
+          npx cap sync android
+
+          if [ ! -f "android/gradlew" ]; then
+            echo "::error::Gradle Wrapper introuvable dans android/gradlew."
+            exit 1
+          fi
+          chmod +x android/gradlew
+
+      - name: Build Debug APK with Gradle
+        working-directory: android
+        run: |
+          ./gradlew :app:assembleDebug --stacktrace --no-daemon
+
+      - name: Verify and prepare APK output
+        run: |
+          APK_DEFAULT="android/app/build/outputs/apk/debug/app-debug.apk"
+          APK_TARGET="android/app/build/outputs/apk/debug/RIZZ-APP-debug.apk"
+          
+          if [ -f "$APK_DEFAULT" ]; then
+            echo "✅ APK Debug généré avec succès : $APK_DEFAULT"
+            cp "$APK_DEFAULT" "$APK_TARGET"
+            echo "✅ Fichier prêt pour le téléchargement : $APK_TARGET"
+            ls -lh android/app/build/outputs/apk/debug/
+          else
+            echo "::error::Échec de la compilation : $APK_DEFAULT introuvable."
+            exit 1
+          fi
+
+      - name: Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RIZZ-APP-debug-apk
+          path: |
+            android/app/build/outputs/apk/debug/RIZZ-APP-debug.apk
+            android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30

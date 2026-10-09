@@ -1,0 +1,7 @@
+{
+  "name": "RIZZ AI - Copilote de conversation",
+  "description": "Ton copilote de conversation pour analyser captures et messages et générer des réponses sur mesure.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

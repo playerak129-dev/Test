@@ -1,0 +1,144 @@
+@import "tailwindcss";
+
+:root {
+  --accent-color: #007AFF;
+  --accent-rgb: 0, 122, 255;
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+  background-color: #f7f9fc;
+  color: #1c1c1e;
+  overflow-x: hidden;
+}
+
+.dark body {
+  background-color: #0b0e14;
+  color: #f2f2f7;
+}
+
+/* Animations de dégradé dynamique subtil iOS 26 */
+@keyframes ambientFloat1 {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translate(30px, -25px) scale(1.08);
+    opacity: 0.45;
+  }
+}
+
+@keyframes ambientFloat2 {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1);
+    opacity: 0.25;
+  }
+  50% {
+    transform: translate(-35px, 20px) scale(1.05);
+    opacity: 0.38;
+  }
+}
+
+@keyframes ambientWave {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.ambient-blob-1 {
+  animation: ambientFloat1 18s ease-in-out infinite;
+}
+
+.ambient-blob-2 {
+  animation: ambientFloat2 24s ease-in-out infinite;
+}
+
+/* Glassmorphism ultra-fin iOS 26 */
+.ios-glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+}
+
+.dark .ios-glass {
+  background: rgba(18, 22, 30, 0.72);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ios-card {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04), 0 2px 6px -1px rgba(0, 0, 0, 0.02);
+}
+
+.dark .ios-card {
+  background: rgba(24, 28, 38, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.3);
+}
+
+/* Curseur / Range Input iOS Style */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 0.5px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18), 0 0 1px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s ease;
+}
+
+input[type="range"]:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 0.5px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+/* Masquer la scrollbar tout en gardant le défilement */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
