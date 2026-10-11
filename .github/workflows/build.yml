@@ -33,92 +33,149 @@ jobs:
       - name: Set up Java 17 (Temurin)
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '17'
-          cache: 'gradle'
+          cache: gradle
 
+      # Android SDK : installation sans le paquet obsolète "tools"
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept Android SDK licenses
+        shell: bash
         run: |
-          yes | sdkmanager --licenses || true
+          set -e
+
+          export ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          export ANDROID_SDK_ROOT="$ANDROID_HOME"
+
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+
+          if [ ! -d "$ANDROID_HOME/cmdline-tools" ]; then
+            echo "::error::Android SDK command-line tools introuvables."
+            exit 1
+          fi
+
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" \
+            -type f -name sdkmanager | sort -V | tail -n 1)"
+
+          if [ -z "$SDKMANAGER" ]; then
+            echo "::error::sdkmanager introuvable."
+            exit 1
+          fi
+
+          echo "SDK Manager détecté : $SDKMANAGER"
+
+          yes | "$SDKMANAGER" \
+            --sdk_root="$ANDROID_HOME" --licenses || true
+
+          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;36.0.0"
+
+          echo "Vérification du SDK Android..."
+          test -d "$ANDROID_HOME/platforms/android-36"
+          test -d "$ANDROID_HOME/build-tools/36.0.0"
 
       - name: Install dependencies
+        shell: bash
         run: |
-          if [ -f "bun.lock" ] && command -v bun &> /dev/null; then
-            echo "Lockfile bun.lock détecté. Installation via Bun..."
-            bun install --frozen-lockfile || bun install
+          set -e
+
+          if [ -f "bun.lock" ] || [ -f "bun.lockb" ]; then
+            echo "Installation des dépendances avec Bun..."
+            bun install
           elif [ -f "package-lock.json" ]; then
-            echo "Lockfile package-lock.json détecté. Installation via npm ci..."
+            echo "Installation des dépendances avec npm ci..."
             npm ci || npm install --legacy-peer-deps
           else
-            echo "Installation standard via npm..."
+            echo "Installation standard avec npm..."
             npm install --legacy-peer-deps
           fi
 
       - name: Build web application
         env:
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL || vars.VITE_API_BASE_URL || '' }}
+        shell: bash
         run: |
-          if [ -f "bun.lock" ] && command -v bun &> /dev/null; then
+          set -e
+
+          if [ -f "bun.lock" ] || [ -f "bun.lockb" ]; then
             bun run build
           else
             npm run build
           fi
 
           if [ ! -f "dist/index.html" ]; then
-            echo "::error::Échec de la compilation web : dist/index.html introuvable."
+            echo "::error::Compilation web échouée : dist/index.html introuvable."
             exit 1
           fi
 
+          echo "Compilation web terminée."
+
       - name: Find or Initialize Android project
+        shell: bash
         run: |
-          echo "=== Vérification de la configuration Android ==="
+          set -e
+
+          echo "Vérification du projet Android..."
+
           if [ -d "android" ] && [ -f "android/gradlew" ]; then
-            echo "✅ Projet Android Gradle existant détecté dans ./android."
-            echo "✅ Gradle Wrapper présent : android/gradlew"
+            echo "Projet Android Gradle existant détecté."
           else
-            echo "⚠️ Aucun projet Android ou Gradle Wrapper trouvé dans le dépôt."
-            echo "ℹ️ Génération de la plateforme Android avec Capacitor (@capacitor/android)..."
+            echo "Initialisation de la plateforme Android..."
+
             npx cap add android
+
             if [ ! -f "android/gradlew" ]; then
-              echo "::error::Échec de la génération de la plateforme Android : android/gradlew est introuvable."
+              echo "::error::android/gradlew introuvable après initialisation."
               exit 1
             fi
-            echo "✅ Plateforme Android générée avec succès."
           fi
 
       - name: Sync Capacitor Android
+        shell: bash
         run: |
-          echo "Synchronisation des assets web et des configurations natives..."
+          set -e
+
           npx cap sync android
 
           if [ ! -f "android/gradlew" ]; then
-            echo "::error::Gradle Wrapper introuvable dans android/gradlew."
+            echo "::error::Gradle Wrapper introuvable."
             exit 1
           fi
+
           chmod +x android/gradlew
 
       - name: Build Debug APK with Gradle
         working-directory: android
+        shell: bash
         run: |
-          ./gradlew :app:assembleDebug --stacktrace --no-daemon
+          set -e
+
+          ./gradlew :app:assembleDebug \
+            --stacktrace \
+            --no-daemon
 
       - name: Verify and prepare APK output
+        shell: bash
         run: |
+          set -e
+
           APK_DEFAULT="android/app/build/outputs/apk/debug/app-debug.apk"
           APK_TARGET="android/app/build/outputs/apk/debug/RIZZ-APP-debug.apk"
-          
-          if [ -f "$APK_DEFAULT" ]; then
-            echo "✅ APK Debug généré avec succès : $APK_DEFAULT"
-            cp "$APK_DEFAULT" "$APK_TARGET"
-            echo "✅ Fichier prêt pour le téléchargement : $APK_TARGET"
-            ls -lh android/app/build/outputs/apk/debug/
-          else
-            echo "::error::Échec de la compilation : $APK_DEFAULT introuvable."
+
+          if [ ! -f "$APK_DEFAULT" ]; then
+            echo "::error::APK introuvable : $APK_DEFAULT"
+            echo "Vérification des APK générés..."
+            find android -type f -name "*.apk" -print || true
             exit 1
           fi
+
+          cp "$APK_DEFAULT" "$APK_TARGET"
+
+          echo "APK généré avec succès :"
+          ls -lh "$APK_DEFAULT" "$APK_TARGET"
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
