@@ -124,7 +124,6 @@ jobs:
             echo "Projet Android Gradle existant détecté."
           else
             echo "Initialisation de la plateforme Android..."
-
             npx cap add android
 
             if [ ! -f "android/gradlew" ]; then
